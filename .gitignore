@@ -6,9 +6,6 @@
 data/
 *.db
 
-# Backend (tracked in separate private repo)
-backend/
-
 # Frontend
 frontend/.next/
 frontend/node_modules/

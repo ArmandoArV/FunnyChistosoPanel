@@ -3,6 +3,7 @@ package websocket
 import (
 	"log"
 	"sync"
+	"time"
 
 	fiberws "github.com/gofiber/websocket/v2"
 )
@@ -65,6 +66,10 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) HandleConnection(conn *fiberws.Conn) {
+	// Configure WebSocket timeouts to prevent premature disconnection
+	conn.SetReadDeadline(time.Time{}) // No read deadline
+	conn.SetWriteDeadline(time.Time{}) // No write deadline
+
 	client := &Client{
 		Hub:  h,
 		Conn: conn,
@@ -73,24 +78,44 @@ func (h *Hub) HandleConnection(conn *fiberws.Conn) {
 
 	h.Register <- client
 
+	// Send welcome message to confirm connection
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		select {
+		case client.Send <- []byte(`{"type":"connected","message":"Welcome to C2 WebSocket"}`):
+			log.Printf("[WS] Sent welcome message to new client")
+		default:
+			log.Printf("[WS] Failed to send welcome message (channel busy)")
+		}
+	}()
+
 	go client.writePump()
 	client.readPump()
 }
 
 func (c *Client) readPump() {
 	defer func() {
+		log.Printf("[WS] Client readPump exiting, unregistering")
 		c.Hub.Unregister <- c
 		c.Conn.Close()
 	}()
+
+	// Set read deadline for ping/pong keepalive (2 minutes)
+	c.Conn.SetReadDeadline(time.Now().Add(120 * time.Second))
 
 	for {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if fiberws.IsUnexpectedCloseError(err, fiberws.CloseGoingAway, fiberws.CloseAbnormalClosure) {
-				log.Printf("[WS] Read error: %v", err)
+				log.Printf("[WS] Unexpected close error: %v", err)
+			} else {
+				log.Printf("[WS] Read error (possibly timeout or normal close): %v", err)
 			}
 			break
 		}
+		
+		// Reset read deadline on any message received
+		c.Conn.SetReadDeadline(time.Now().Add(120 * time.Second))
 		
 		// Handle ping/pong for keepalive
 		msgStr := string(message)

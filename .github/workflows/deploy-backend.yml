@@ -36,6 +36,27 @@ jobs:
           target: "/home/${{ secrets.VM_USER }}/FunnyChistosoPanel/backend/"
           strip_components: 1
 
+      - name: Write .env to VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cat > ~/FunnyChistosoPanel/backend/.env << 'ENVEOF'
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=5432
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            C2_PORT=:4444
+            API_PORT=:8080
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
+            SCREENSHOT_STORAGE_PATH=./screenshots
+            SCREENSHOT_BASE_URL=${{ secrets.SCREENSHOT_BASE_URL }}
+            ENVEOF
+
       - name: Restart service on VM
         uses: appleboy/ssh-action@v1.0.3
         with:

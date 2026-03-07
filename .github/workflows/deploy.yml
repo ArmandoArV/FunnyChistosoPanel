@@ -8,6 +8,15 @@ on:
       - 'vercel.json'
       - 'package.json'
   workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'API URL (Cloudflare tunnel)'
+        required: false
+        type: string
+      ws_url:
+        description: 'WebSocket URL (Cloudflare tunnel)'
+        required: false
+        type: string
 
 jobs:
   deploy:
@@ -25,6 +34,24 @@ jobs:
       env:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    - name: Override tunnel URLs in env
+      if: ${{ inputs.api_url != '' }}
+      run: |
+        ENV_FILE=".vercel/.env.production.local"
+        inject() {
+          local key=$1 val=$2
+          if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+            sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+          else
+            echo "${key}=${val}" >> "$ENV_FILE"
+          fi
+        }
+        inject "NEXT_PUBLIC_API_URL" "${{ inputs.api_url }}"
+        inject "NEXT_PUBLIC_WS_URL" "${{ inputs.ws_url }}"
+        echo "✅ Injected tunnel URLs into build env"
+        echo "  API: ${{ inputs.api_url }}"
+        echo "  WS:  ${{ inputs.ws_url }}"
       
     - name: Build Project Artifacts
       run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}

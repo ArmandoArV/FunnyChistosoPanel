@@ -1,0 +1,41 @@
+# Binaries
+c2server
+c2server-linux
+c2server.exe
+*.exe
+
+# Database
+data/
+*.db
+*.bolt
+
+# Build artifacts
+*.o
+*.a
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+nohup.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage.out
+*.test
+
+# Go workspace
+go.work
+go.work.sum

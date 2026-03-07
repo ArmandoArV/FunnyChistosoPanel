@@ -36,36 +36,44 @@ jobs:
           target: "/home/${{ secrets.VM_USER }}/FunnyChistosoPanel/backend/"
           strip_components: 1
 
-      - name: Write .env to VM
+      - name: Deploy and restart on VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            printf 'DB_HOST=%s\nDB_PORT=5432\nDB_USER=%s\nDB_PASSWORD=%s\nDB_NAME=%s\nC2_PORT=:4444\nAPI_PORT=:8080\nJWT_SECRET=%s\nDISCORD_WEBHOOK_URL=%s\nSCREENSHOT_STORAGE_PATH=./screenshots\nSCREENSHOT_BASE_URL=%s\n' \
-              '${{ secrets.DB_HOST }}' \
-              '${{ secrets.DB_USER }}' \
-              '${{ secrets.DB_PASSWORD }}' \
-              '${{ secrets.DB_NAME }}' \
-              '${{ secrets.JWT_SECRET }}' \
-              '${{ secrets.DISCORD_WEBHOOK_URL }}' \
-              '${{ secrets.SCREENSHOT_BASE_URL }}' \
-              > ~/FunnyChistosoPanel/backend/.env
-            echo "[✓] .env written"
-            cat ~/FunnyChistosoPanel/backend/.env | grep -v PASSWORD | grep -v SECRET | grep -v WEBHOOK
-
-      - name: Restart service on VM
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
+            set -e
             cd ~/FunnyChistosoPanel/backend
+
+            echo "Writing .env..."
+            cat > .env << EOF
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=5432
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            C2_PORT=:4444
+            API_PORT=:8080
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
+            SCREENSHOT_STORAGE_PATH=./screenshots
+            SCREENSHOT_BASE_URL=${{ secrets.SCREENSHOT_BASE_URL }}
+            EOF
+            sed -i 's/^[[:space:]]*//' .env
+            echo "[✓] .env written with $(wc -l < .env) lines"
+            grep -v -i "password\|secret\|webhook\|token" .env
+
+            echo "Restarting C2 backend..."
             chmod +x c2server-linux
             pkill -f c2server-linux || true
             sleep 1
             nohup ./c2server-linux > ~/c2server.log 2>&1 &
-            sleep 4
+            sleep 5
+            if pgrep -f c2server-linux > /dev/null; then
+              echo "✅ C2 backend is running (PID: $(pgrep -f c2server-linux))"
+            else
+              echo "❌ C2 backend failed to start"
+              exit 1
+            fi
             tail -30 ~/c2server.log

@@ -1,0 +1,28 @@
+# Environment
+.env
+.env.local
+
+# Database
+data/
+*.db
+
+# Backend (tracked in separate private repo)
+backend/
+
+# Frontend
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

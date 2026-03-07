@@ -12,6 +12,8 @@ import (
 	"c2-control-panel/database"
 	"c2-control-panel/services"
 	"c2-control-panel/websocket"
+
+	"github.com/joho/godotenv"
 )
 
 func getEnv(key, fallback string) string {
@@ -22,6 +24,12 @@ func getEnv(key, fallback string) string {
 }
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("[!] No .env file found, using environment variables")
+	} else {
+		log.Println("[✓] Loaded .env file")
+	}
+
 	log.Println("[*] C2 Control Panel Starting...")
 
 	// PostgreSQL connection

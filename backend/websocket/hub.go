@@ -91,6 +91,19 @@ func (c *Client) readPump() {
 			}
 			break
 		}
+		
+		// Handle ping/pong for keepalive
+		msgStr := string(message)
+		if msgStr == `{"type":"ping"}` || msgStr == "ping" {
+			log.Printf("[WS] Received ping, sending pong")
+			select {
+			case c.Send <- []byte(`{"type":"pong"}`):
+			default:
+				log.Printf("[WS] Failed to send pong (channel full)")
+			}
+			continue
+		}
+		
 		log.Printf("[WS] Received: %s", message)
 	}
 }

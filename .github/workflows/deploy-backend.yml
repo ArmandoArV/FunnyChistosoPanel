@@ -24,7 +24,7 @@ jobs:
       - name: Build Linux binary
         run: |
           cd backend
-          GOOS=linux GOARCH=amd64 go build -o c2server-linux .
+          GOWORK=off CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o c2server-linux .
 
       - name: Copy binary to VM
         uses: appleboy/scp-action@v0.1.7

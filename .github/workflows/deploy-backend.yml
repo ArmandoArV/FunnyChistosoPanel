@@ -1,0 +1,52 @@
+name: Deploy Backend to Azure VM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: backend/go.sum
+
+      - name: Build Linux binary
+        run: |
+          cd backend
+          GOOS=linux GOARCH=amd64 go build -o c2server-linux .
+
+      - name: Copy binary to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "backend/c2server-linux"
+          target: "/home/${{ secrets.VM_USER }}/FunnyChistosoPanel/backend/"
+          strip_components: 1
+
+      - name: Restart service on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd ~/FunnyChistosoPanel/backend
+            chmod +x c2server-linux
+            pkill -f c2server-linux || true
+            sleep 1
+            nohup ./c2server-linux > ~/c2server.log 2>&1 &
+            sleep 4
+            tail -30 ~/c2server.log

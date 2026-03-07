@@ -38,10 +38,14 @@ jobs:
 
       - name: Deploy and restart on VM
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
+          envs: VERCEL_TOKEN,VERCEL_PROJECT_ID
           script: |
             set -e
             cd ~/FunnyChistosoPanel/backend
@@ -77,3 +81,62 @@ jobs:
               exit 1
             fi
             tail -30 ~/c2server.log
+
+            echo "Starting Cloudflare tunnel..."
+            pkill cloudflared || true
+            sleep 1
+            rm -f ~/cloudflared.log
+            nohup cloudflared tunnel --url http://localhost:8080 > ~/cloudflared.log 2>&1 &
+
+            TUNNEL_URL=""
+            for i in $(seq 1 30); do
+              TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' ~/cloudflared.log 2>/dev/null | head -1)
+              [ -n "$TUNNEL_URL" ] && break
+              sleep 1
+            done
+
+            if [ -z "$TUNNEL_URL" ]; then
+              echo "❌ Cloudflare tunnel URL not captured"
+              cat ~/cloudflared.log
+              exit 1
+            fi
+
+            echo "✅ Tunnel URL: $TUNNEL_URL"
+            WS_URL="${TUNNEL_URL/https:/wss:}/ws"
+
+            ENV_LIST=$(curl -sf "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env" \
+              -H "Authorization: Bearer $VERCEL_TOKEN")
+
+            API_ENV_ID=$(echo "$ENV_LIST" | python3 -c "
+            import sys, json
+            for e in json.load(sys.stdin).get('envs', []):
+              if e['key'] == 'NEXT_PUBLIC_API_URL' and 'production' in e.get('target', []):
+                print(e['id']); break
+            ")
+            WS_ENV_ID=$(echo "$ENV_LIST" | python3 -c "
+            import sys, json
+            for e in json.load(sys.stdin).get('envs', []):
+              if e['key'] == 'NEXT_PUBLIC_WS_URL' and 'production' in e.get('target', []):
+                print(e['id']); break
+            ")
+
+            curl -sf -X PATCH "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$API_ENV_ID" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"value\": \"$TUNNEL_URL\"}" > /dev/null
+
+            curl -sf -X PATCH "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$WS_ENV_ID" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"value\": \"$WS_URL\"}" > /dev/null
+
+            echo "✅ Vercel env vars updated to $TUNNEL_URL"
+
+      - name: Trigger frontend redeploy
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/dispatches" \
+            -d '{"ref":"main"}'
+          echo "✅ Frontend redeploy triggered"

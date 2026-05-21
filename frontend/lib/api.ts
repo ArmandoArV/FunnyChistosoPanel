@@ -72,7 +72,7 @@ export async function createUser(
   const res = await fetch(`${getApiUrl()}/api/admin/users`, {
     method: "POST",
     headers: buildHeaders(token),
-    body: JSON.stringify({ discord_id: discordId }),
+    body: JSON.stringify({ discordId: discordId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

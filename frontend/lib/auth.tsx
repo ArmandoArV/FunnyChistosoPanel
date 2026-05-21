@@ -20,7 +20,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function setTokenCookie(token: string) {
-  document.cookie = `token=${token}; path=/; SameSite=Strict`;
+  const isSecure = window.location.protocol === "https:";
+  document.cookie = `token=${token}; path=/; SameSite=Strict${isSecure ? "; Secure" : ""}`;
 }
 
 function clearTokenCookie() {
@@ -33,15 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
+    const storedToken = sessionStorage.getItem("token");
+    const storedUser = sessionStorage.getItem("user");
     if (storedToken && storedUser) {
       try {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
       } catch {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
         clearTokenCookie();
       }
     }
@@ -59,16 +60,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await response.json();
     setToken(data.token);
     setUser(data.user);
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
+    sessionStorage.setItem("token", data.token);
+    sessionStorage.setItem("user", JSON.stringify(data.user));
     setTokenCookie(data.token);
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
     clearTokenCookie();
   };
 

@@ -7,6 +7,13 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
   const { pathname } = request.nextUrl;
 
+  // Block debug page in production
+  if (pathname === "/debug" || pathname.startsWith("/debug/")) {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+  }
+
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(route + "/")
   );
@@ -23,5 +30,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|debug).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

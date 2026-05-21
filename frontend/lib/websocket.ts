@@ -15,12 +15,10 @@ export function useWebSocket(url: string) {
 
     function connect() {
       try {
-        console.log("[WS] Connecting to", url);
         socket = new WebSocket(url);
         wsRef.current = socket;
 
         socket.onopen = () => {
-          console.log("[WS] Connected");
           setConnected(true);
           intentionalCloseRef.current = false;
 
@@ -32,9 +30,7 @@ export function useWebSocket(url: string) {
             if (socket.readyState === WebSocket.OPEN) {
               try {
                 socket.send(JSON.stringify({ type: "ping" }));
-                console.log("[WS] Sent ping");
-              } catch (err) {
-                console.error("[WS] Failed to send ping:", err);
+              } catch {
               }
             }
           }, 30000); // 30 seconds
@@ -44,14 +40,12 @@ export function useWebSocket(url: string) {
           const data = e.data;
           // Ignore pong responses
           if (data === "pong" || data === '{"type":"pong"}') {
-            console.log("[WS] Received pong");
             return;
           }
           setLastMessage(data);
         };
 
-        socket.onclose = (event) => {
-          console.log("[WS] Disconnected", event.code, event.reason);
+        socket.onclose = () => {
           setConnected(false);
 
           // Clear ping interval
@@ -60,24 +54,20 @@ export function useWebSocket(url: string) {
             pingIntervalRef.current = null;
           }
 
-          // Only reconnect if not intentionally closed
           if (!intentionalCloseRef.current) {
-            console.log("[WS] Reconnecting in 3 seconds...");
             if (reconnectTimerRef.current) {
               clearTimeout(reconnectTimerRef.current);
             }
             reconnectTimerRef.current = setTimeout(connect, 3000);
           } else {
-            console.log("[WS] Intentional close, not reconnecting");
+            // Intentional close
           }
         };
 
-        socket.onerror = (error) => {
-          console.error("[WS] Error:", error);
+        socket.onerror = () => {
           // Let onclose handle reconnection
         };
-      } catch (err) {
-        console.error("[WS] Connection failed:", err);
+      } catch {
         setConnected(false);
         if (!intentionalCloseRef.current) {
           if (reconnectTimerRef.current) {
@@ -91,7 +81,6 @@ export function useWebSocket(url: string) {
     connect();
 
     return () => {
-      console.log("[WS] Cleanup: closing connection");
       intentionalCloseRef.current = true;
 
       if (reconnectTimerRef.current) {

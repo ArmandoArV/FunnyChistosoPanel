@@ -75,8 +75,8 @@ export async function createUser(
     body: JSON.stringify({ discordId: discordId }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to create user");
+    await res.json().catch(() => ({}));
+    throw new Error("Failed to create user");
   }
   return res.json();
 }

@@ -18,11 +18,12 @@ import {
   SettingsRegular,
   SignOutRegular,
   ChevronLeftRegular,
+  ArrowDownloadRegular,
 } from "@fluentui/react-icons";
 import { VictimCard } from "@/components/ui/VictimCard";
 import { Terminal } from "@/components/ui/Terminal";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
-import { getVictims, sendCommand, disconnectVictim } from "@/lib/api";
+import { getVictims, sendCommand, disconnectVictim, downloadMyAgent } from "@/lib/api";
 import { useWebSocket } from "@/lib/websocket";
 import { useAuth } from "@/lib/auth";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -390,6 +391,27 @@ export function DashboardContainer({
               {!isMobile ? "Admin" : undefined}
             </Button>
           )}
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={<ArrowDownloadRegular />}
+            onClick={async () => {
+              if (!token) return;
+              try {
+                const blob = await downloadMyAgent(token);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `agent-${user.username}.exe`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                alert("Failed to build agent. Try again.");
+              }
+            }}
+          >
+            {!isMobile ? "My Agent" : undefined}
+          </Button>
           <Button
             appearance="subtle"
             size="small"

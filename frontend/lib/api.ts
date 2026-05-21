@@ -102,3 +102,10 @@ export async function downloadAgent(
   return res.blob();
 }
 
+export async function downloadMyAgent(token: string): Promise<Blob> {
+  const res = await fetch(`${getApiUrl()}/api/me/agent`, {
+    headers: buildHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to download agent");
+  return res.blob();
+}

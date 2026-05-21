@@ -16,7 +16,6 @@ import {
   DesktopRegular,
   SearchRegular,
   SettingsRegular,
-  SignOutRegular,
   ChevronLeftRegular,
   ArrowDownloadRegular,
   TargetRegular,
@@ -24,6 +23,7 @@ import {
 import { VictimCard } from "@/components/ui/VictimCard";
 import { Terminal } from "@/components/ui/Terminal";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
+import { LogoutDialog } from "@/components/ui/LogoutDialog";
 import { getVictims, sendCommand, disconnectVictim, downloadMyAgent } from "@/lib/api";
 import { useWebSocket } from "@/lib/websocket";
 import { useAuth } from "@/lib/auth";
@@ -413,14 +413,7 @@ export function DashboardContainer({
           >
             {!isMobile ? "My Agent" : undefined}
           </Button>
-          <Button
-            appearance="subtle"
-            size="small"
-            icon={<SignOutRegular />}
-            onClick={logout}
-          >
-            {!isMobile ? "Logout" : undefined}
-          </Button>
+          <LogoutDialog onConfirm={logout} showLabel={!isMobile} />
         </div>
       </div>
 

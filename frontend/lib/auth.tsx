@@ -71,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("user");
     clearTokenCookie();
+    window.location.href = "/login";
   };
 
   return (

@@ -33,6 +33,7 @@ import {
   CheckmarkRegular,
 } from "@fluentui/react-icons";
 import { useAuth } from "@/lib/auth";
+import { LogoutDialog } from "@/components/ui/LogoutDialog";
 import { createUser, getUsers, downloadAgent, type ManagedUser, type CreateUserResponse } from "@/lib/api";
 
 const useStyles = makeStyles({
@@ -276,7 +277,7 @@ export function AdminContainer() {
           <Button size="small" icon={<HomeRegular />} onClick={() => router.push("/")}>
             Dashboard
           </Button>
-          <Button size="small" onClick={logout}>Logout</Button>
+          <LogoutDialog onConfirm={logout} />
         </div>
       </div>
 

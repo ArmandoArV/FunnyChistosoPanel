@@ -11,7 +11,7 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { ArrowClockwiseRegular } from "@fluentui/react-icons";
+import { ArrowClockwiseRegular, WrenchRegular } from "@fluentui/react-icons";
 
 const useStyles = makeStyles({
   card: { marginBottom: "12px" },
@@ -130,8 +130,8 @@ export function DebugContainer() {
 
   return (
     <div style={{ padding: "24px", maxWidth: "680px", margin: "0 auto" }}>
-      <Text size={600} weight="semibold" block style={{ marginBottom: "4px" }}>
-        🔧 Debug Dashboard
+      <Text size={600} weight="semibold" block style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+        <WrenchRegular /> Debug Dashboard
       </Text>
       <Text size={200} style={{ color: tokens.colorNeutralForeground3 }} block>
         Open this page at <code>http://localhost:3000/debug</code>

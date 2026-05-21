@@ -19,6 +19,7 @@ import {
   SignOutRegular,
   ChevronLeftRegular,
   ArrowDownloadRegular,
+  TargetRegular,
 } from "@fluentui/react-icons";
 import { VictimCard } from "@/components/ui/VictimCard";
 import { Terminal } from "@/components/ui/Terminal";
@@ -366,7 +367,7 @@ export function DashboardContainer({
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <Text size={500} weight="semibold" style={{ whiteSpace: "nowrap" }}>
-            🎯 C2 Panel
+            <TargetRegular style={{ fontSize: "20px", marginRight: "4px" }} /> C2 Panel
           </Text>
         </div>
         <div className={styles.headerRight}>

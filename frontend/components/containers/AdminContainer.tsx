@@ -30,6 +30,7 @@ import {
   ArrowDownloadRegular,
   HomeRegular,
   ServerRegular,
+  CheckmarkRegular,
 } from "@fluentui/react-icons";
 import { useAuth } from "@/lib/auth";
 import { createUser, getUsers, downloadAgent, type ManagedUser, type CreateUserResponse } from "@/lib/api";
@@ -313,8 +314,8 @@ export function AdminContainer() {
 
           {newCreds && (
             <div>
-              <Text size={300} weight="semibold" style={{ display: "block", marginBottom: "8px" }}>
-                ✅ User Created — Save these credentials!
+              <Text size={300} weight="semibold" style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                <CheckmarkRegular style={{ color: tokens.colorPaletteGreenForeground1 }} /> User Created — Save these credentials!
               </Text>
               <div className={styles.credentialBox}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

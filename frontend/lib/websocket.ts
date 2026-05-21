@@ -53,7 +53,7 @@ export function useWebSocket(url: string) {
         socket.onclose = (event) => {
           console.log("[WS] Disconnected", event.code, event.reason);
           setConnected(false);
-          
+
           // Clear ping interval
           if (pingIntervalRef.current) {
             clearInterval(pingIntervalRef.current);
@@ -93,17 +93,17 @@ export function useWebSocket(url: string) {
     return () => {
       console.log("[WS] Cleanup: closing connection");
       intentionalCloseRef.current = true;
-      
+
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
-      
+
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = null;
       }
-      
+
       if (socket && socket.readyState !== WebSocket.CLOSED) {
         socket.close();
       }

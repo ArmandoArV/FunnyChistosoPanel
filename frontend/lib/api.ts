@@ -48,3 +48,57 @@ export async function disconnectVictim(
   if (!res.ok) throw new Error("Failed to disconnect");
 }
 
+// ── Admin API ──
+
+export interface ManagedUser {
+  id: string;
+  username: string;
+  role: string;
+  discord_id: string;
+  enrollment_token: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface CreateUserResponse {
+  user: ManagedUser;
+  password: string;
+}
+
+export async function createUser(
+  discordId: string,
+  token: string
+): Promise<CreateUserResponse> {
+  const res = await fetch(`${getApiUrl()}/api/admin/users`, {
+    method: "POST",
+    headers: buildHeaders(token),
+    body: JSON.stringify({ discord_id: discordId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to create user");
+  }
+  return res.json();
+}
+
+export async function getUsers(token: string): Promise<ManagedUser[]> {
+  const res = await fetch(`${getApiUrl()}/api/admin/users`, {
+    headers: buildHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to fetch users");
+  const data = await res.json();
+  return data.users ?? [];
+}
+
+export async function downloadAgent(
+  userId: string,
+  token: string
+): Promise<Blob> {
+  const res = await fetch(
+    `${getApiUrl()}/api/admin/users/${encodeURIComponent(userId)}/agent`,
+    { headers: buildHeaders(token) }
+  );
+  if (!res.ok) throw new Error("Failed to download agent");
+  return res.blob();
+}
+

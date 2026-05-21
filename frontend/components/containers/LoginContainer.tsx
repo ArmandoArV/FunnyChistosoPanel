@@ -95,7 +95,7 @@ export function LoginContainer() {
         <form onSubmit={handleSubmit} className={styles.form}>
           <Input
             type="text"
-            placeholder="Username"
+            placeholder="Username or Discord ID"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             disabled={loading}

@@ -1,0 +1,201 @@
+<!doctype html>
+<html>
+  <head>
+    <title>WebSocket Test</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+      }
+      #log {
+        white-space: pre-wrap;
+        border: 1px solid #555;
+        padding: 10px;
+        margin-top: 10px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      button {
+        margin: 5px;
+        padding: 10px;
+      }
+      .success {
+        color: #4ec9b0;
+      }
+      .error {
+        color: #f14c4c;
+      }
+      .info {
+        color: #569cd6;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🧪 WebSocket Connection Test</h2>
+
+    <div>
+      <input
+        type="text"
+        id="wsUrl"
+        value="wss://reproduce-jersey-finds-keys.trycloudflare.com/ws"
+        style="width: 500px; padding: 5px"
+      />
+      <button onclick="connect()">Connect</button>
+      <button onclick="disconnect()">Disconnect</button>
+      <button onclick="sendPing()">Send Ping</button>
+      <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+      let ws = null;
+      let pingInterval = null;
+
+      function log(msg, type = "info") {
+        const logEl = document.getElementById("log");
+        const timestamp = new Date().toLocaleTimeString();
+        const color =
+          type === "success" ? "success" : type === "error" ? "error" : "info";
+        logEl.innerHTML += `<span class="${color}">[${timestamp}] ${msg}</span>\n`;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function connect() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          log("⚠️ Already connected", "error");
+          return;
+        }
+
+        const url = document.getElementById("wsUrl").value;
+        log(`🔌 Connecting to ${url}...`, "info");
+
+        try {
+          ws = new WebSocket(url);
+
+          ws.onopen = () => {
+            log("✅ Connected successfully!", "success");
+            log(`   ReadyState: ${ws.readyState}`, "success");
+            log(`   Protocol: ${ws.protocol || "none"}`, "success");
+            log(`   Extensions: ${ws.extensions || "none"}`, "success");
+
+            // Start auto-ping every 5 seconds
+            if (pingInterval) clearInterval(pingInterval);
+            pingInterval = setInterval(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                sendPing();
+              }
+            }, 5000);
+          };
+
+          ws.onmessage = (event) => {
+            log(`📨 Message received: ${event.data}`, "success");
+            try {
+              const data = JSON.parse(event.data);
+              log(`   Parsed: ${JSON.stringify(data, null, 2)}`, "success");
+            } catch (e) {
+              log(`   Raw data (not JSON)`, "info");
+            }
+          };
+
+          ws.onerror = (error) => {
+            log(`❌ Error occurred:`, "error");
+            log(`   Type: ${error.type}`, "error");
+            log(`   ReadyState: ${ws.readyState}`, "error");
+            console.error("WebSocket error:", error);
+          };
+
+          ws.onclose = (event) => {
+            log(`🔌 Connection closed`, "error");
+            log(`   Code: ${event.code}`, "error");
+            log(
+              `   Reason: "${event.reason}" ${event.reason ? "" : "(empty)"}`,
+              "error",
+            );
+            log(`   Clean: ${event.wasClean}`, "error");
+
+            if (pingInterval) {
+              clearInterval(pingInterval);
+              pingInterval = null;
+            }
+
+            // Common close codes
+            const closeCodes = {
+              1000: "Normal Closure",
+              1001: "Going Away",
+              1002: "Protocol Error",
+              1003: "Unsupported Data",
+              1006: "Abnormal Closure (no close frame)",
+              1007: "Invalid frame payload data",
+              1008: "Policy Violation",
+              1009: "Message too big",
+              1010: "Missing Extension",
+              1011: "Internal Error",
+              1015: "TLS Handshake Failed",
+            };
+
+            if (closeCodes[event.code]) {
+              log(`   Meaning: ${closeCodes[event.code]}`, "error");
+            }
+
+            if (event.code === 1006) {
+              log(`   ⚠️ Error 1006 means:`, "error");
+              log(`      - Connection dropped without proper close`, "error");
+              log(`      - Backend might have crashed`, "error");
+              log(`      - Network issue or proxy timeout`, "error");
+              log(`      - CORS/Origin rejection`, "error");
+            }
+          };
+        } catch (err) {
+          log(`❌ Failed to create WebSocket: ${err.message}`, "error");
+          console.error(err);
+        }
+      }
+
+      function disconnect() {
+        if (!ws) {
+          log("⚠️ Not connected", "error");
+          return;
+        }
+        log("🔌 Closing connection...", "info");
+        ws.close(1000, "User requested disconnect");
+        ws = null;
+
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
+      }
+
+      function sendPing() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log("⚠️ Cannot send ping - not connected", "error");
+          return;
+        }
+
+        const ping = JSON.stringify({ type: "ping" });
+        ws.send(ping);
+        log(`📤 Sent: ${ping}`, "info");
+      }
+
+      function clearLog() {
+        document.getElementById("log").innerHTML = "";
+      }
+
+      // Auto-connect on load
+      window.addEventListener("load", () => {
+        log("🚀 Page loaded - ready to test", "success");
+        log('💡 Click "Connect" to start', "info");
+      });
+
+      // Cleanup on page unload
+      window.addEventListener("beforeunload", () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      });
+    </script>
+  </body>
+</html>

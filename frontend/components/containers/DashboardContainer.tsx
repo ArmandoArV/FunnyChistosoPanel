@@ -154,7 +154,8 @@ export function DashboardContainer({
   const { isMobile } = useBreakpoint();
   const router = useRouter();
 
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws";
+  const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080/ws";
+  const wsUrl = token ? `${wsBase}?token=${encodeURIComponent(token)}` : wsBase;
   const { lastMessage, connected } = useWebSocket(wsUrl);
 
   const loadVictims = useCallback(async () => {
@@ -374,14 +375,21 @@ export function DashboardContainer({
               {user.username}
             </Badge>
           )}
-          <Button
-            appearance="subtle"
-            size="small"
-            icon={<SettingsRegular />}
-            onClick={() => router.push("/admin")}
-          >
-            {!isMobile ? "Admin" : undefined}
-          </Button>
+          {!isMobile && user.role && (
+            <Badge appearance="tint" color={user.role === "admin" ? "important" : "informative"}>
+              {user.role}
+            </Badge>
+          )}
+          {user.role === "admin" && (
+            <Button
+              appearance="subtle"
+              size="small"
+              icon={<SettingsRegular />}
+              onClick={() => router.push("/admin")}
+            >
+              {!isMobile ? "Admin" : undefined}
+            </Button>
+          )}
           <Button
             appearance="subtle"
             size="small"

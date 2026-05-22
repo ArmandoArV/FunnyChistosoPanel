@@ -144,3 +144,32 @@ export async function updateAllAgents(
   }
   return { sent, failed, total: victims.length };
 }
+
+export async function getMyWebhook(token: string): Promise<string> {
+  const res = await fetch(`${getApiUrl()}/api/me/webhook`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) handleUnauthorized();
+  if (!res.ok) throw new Error("Failed to get webhook");
+  const data = await res.json();
+  return data.webhook_url || "";
+}
+
+export async function updateMyWebhook(
+  token: string,
+  webhookUrl: string
+): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/api/me/webhook`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ webhook_url: webhookUrl }),
+  });
+  if (res.status === 401) handleUnauthorized();
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to update webhook");
+  }
+}

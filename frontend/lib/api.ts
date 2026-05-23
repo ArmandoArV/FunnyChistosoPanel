@@ -173,3 +173,14 @@ export async function updateMyWebhook(
     throw new Error(data.error || "Failed to update webhook");
   }
 }
+
+export async function testMyWebhook(token: string): Promise<string> {
+  const res = await fetch(`${getApiUrl()}/api/me/webhook/test`, {
+    method: "POST",
+    headers: buildHeaders(token),
+  });
+  if (res.status === 401) { handleUnauthorized(); return ""; }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to test webhook");
+  return data.message || "Test sent";
+}

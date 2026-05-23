@@ -40,7 +40,7 @@ import { ProcessManager } from "@/components/ui/ProcessManager";
 import { VictimInfo } from "@/components/ui/VictimInfo";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { LogoutDialog } from "@/components/ui/LogoutDialog";
-import { getVictims, sendCommand, disconnectVictim, downloadMyAgent, getMyWebhook, updateMyWebhook } from "@/lib/api";
+import { getVictims, sendCommand, disconnectVictim, downloadMyAgent, getMyWebhook, updateMyWebhook, testMyWebhook } from "@/lib/api";
 import { useWebSocket } from "@/lib/websocket";
 import { useAuth } from "@/lib/auth";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -561,6 +561,22 @@ export function DashboardContainer({
                   <DialogTrigger disableButtonEnhancement>
                     <Button appearance="secondary" size="small">Cancel</Button>
                   </DialogTrigger>
+                  <Button
+                    appearance="secondary"
+                    size="small"
+                    disabled={webhookSaving || !webhookUrl}
+                    onClick={async () => {
+                      if (!token) return;
+                      try {
+                        const msg = await testMyWebhook(token);
+                        alert(msg || "Test message sent to your webhook!");
+                      } catch (e) {
+                        alert(e instanceof Error ? e.message : "Failed to test webhook");
+                      }
+                    }}
+                  >
+                    🧪 Test
+                  </Button>
                   <Button
                     appearance="primary"
                     size="small"
